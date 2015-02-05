@@ -6,6 +6,9 @@ This repository includes the implementation of the StringsParser, a parser that 
 
 Use build.sh and run.sh scripts (under Unix-like OS) for compiling and testing StringsParser.
 
+##TIKA-1541
+An issue has been created on the Tika Issue Tracker system: [TIKA-1541](https://issues.apache.org/jira/browse/TIKA-1541). Please refer to that issue for comments and feedback.
+
 ## Notes
 The repository is organized as follows:
   govdocs1/016
