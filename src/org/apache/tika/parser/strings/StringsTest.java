@@ -66,10 +66,11 @@ public class StringsTest {
 		}
 		
 		Timer.end();
-		Timer.reset();
 		
 		// Report
 		System.out.println("Parsing completed in " + Timer.getTimeInSeconds() + " seconds.");
 		System.out.println("Output file: " + output.getName());
+
+		Timer.reset();
 	}
 }
