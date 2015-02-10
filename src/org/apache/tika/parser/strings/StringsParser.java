@@ -18,6 +18,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -27,6 +28,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.tika.exception.TikaException;
+import org.apache.tika.io.IOUtils;
 import org.apache.tika.io.TikaInputStream;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.mime.MediaType;
@@ -55,7 +57,9 @@ public class StringsParser extends AbstractParser {
 	private static final Set<MediaType> SUPPORTED_TYPES = Collections
 			.singleton(MediaType.OCTET_STREAM);
 
-	private static final StringsConfig DEFAULT_CONFIG = new StringsConfig();
+	private static final StringsConfig DEFAULT_STRINGS_CONFIG = new StringsConfig();
+	
+	private static final FileConfig DEFAULT_FILE_CONFIG = new FileConfig();
 
 	@Override
 	public Set<MediaType> getSupportedTypes(ParseContext context) {
@@ -66,9 +70,10 @@ public class StringsParser extends AbstractParser {
 	public void parse(InputStream stream, ContentHandler handler,
 			Metadata metadata, ParseContext context) throws IOException,
 			SAXException, TikaException {
-		StringsConfig config = context.get(StringsConfig.class, DEFAULT_CONFIG);
+		StringsConfig stringsConfig = context.get(StringsConfig.class, DEFAULT_STRINGS_CONFIG);
+		FileConfig fileConfig = context.get(FileConfig.class, DEFAULT_FILE_CONFIG);
 
-		if (!hasStrings(config)) {
+		if (!hasStrings(stringsConfig)) {
 			return;
 		}
 
@@ -76,10 +81,9 @@ public class StringsParser extends AbstractParser {
 		File input = tis.getFile();
 
 		// Metadata
-		metadata.set(Metadata.CONTENT_TYPE, "application/octet-stream");
-		metadata.set("strings:command", config.getStringsCommand());
-		metadata.set("strings:options", config.getOptions());
-		metadata.set("strings:file_output", doFile(input));
+		metadata.set("strings:min-len", "" + stringsConfig.getMinLength());
+		metadata.set("strings:encoding", stringsConfig.toString());
+		metadata.set("strings:file_output", doFile(input, fileConfig));
 
 		int totalBytes = 0;
 
@@ -88,7 +92,7 @@ public class StringsParser extends AbstractParser {
 
 		xhtml.startDocument();
 
-		totalBytes = doStrings(input, config, xhtml);
+		totalBytes = doStrings(input, stringsConfig, xhtml);
 
 		xhtml.endDocument();
 
@@ -105,13 +109,29 @@ public class StringsParser extends AbstractParser {
 	 * @return Returns returns {@code true} if the strings command is supported.
 	 */
 	private boolean hasStrings(StringsConfig config) {
-		String stringsProg = config.getStringsPath()
-				+ config.getStringsCommand();
+		String stringsProg = config.getStringsPath() + getStringsProg();
+
 		String[] checkCmd = { stringsProg, "--version" };
 
 		boolean hasStrings = ExternalParser.check(checkCmd);
 
 		return hasStrings;
+	}
+	
+	/**
+	 * Checks if the "file" command is supported.
+	 * 
+	 * @param config
+	 * @return
+	 */
+	private boolean hasFile(FileConfig config) {
+		String fileProg = config.getFilePath() + getFileProg();
+
+		String[] checkCmd = { fileProg, "--version" };
+
+		boolean hasFile = ExternalParser.check(checkCmd);
+
+		return hasFile;
 	}
 
 	/**
@@ -134,8 +154,20 @@ public class StringsParser extends AbstractParser {
 	private int doStrings(File input, StringsConfig config,
 			XHTMLContentHandler xhtml) throws IOException, TikaException,
 			SAXException {
-		String[] cmd = { config.getStringsPath() + config.getStringsCommand(),
-				input.getPath() };
+		
+		// Builds the command array
+		ArrayList<String> cmdList = new ArrayList<String>(4);
+		cmdList.add(config.getStringsPath() + getStringsProg());
+		cmdList.add("-n");
+		cmdList.add("" + config.getMinLength());;
+		// encoding option is not supported by windows version
+		if (!getStringsProg().endsWith(".exe")) {
+			cmdList.add("-e");
+			cmdList.add("" + config.getEncoding().get());
+		}
+		cmdList.add(input.getPath());
+		
+		String[] cmd = cmdList.toArray(new String[cmdList.size()]);
 
 		ProcessBuilder pb = new ProcessBuilder(cmd);
 		final Process process = pb.start();
@@ -154,7 +186,7 @@ public class StringsParser extends AbstractParser {
 
 		// Reads content printed out by "strings" command
 		int totalBytes = 0;
-		totalBytes = extractOutput(out, xhtml);
+		totalBytes = extractOutput(out, xhtml);		
 
 		try {
 			waitTask.get(config.getTimeout(), TimeUnit.SECONDS);
@@ -200,6 +232,7 @@ public class StringsParser extends AbstractParser {
 		int totalBytes = 0;
 
 		try {
+			// TODO reader = new BufferedReader(new InputStreamReader(stream, IOUtils.UTF_8));
 			reader = new BufferedReader(new InputStreamReader(stream));
 
 			int n = 0;
@@ -225,10 +258,24 @@ public class StringsParser extends AbstractParser {
 	 *            {@see File} object that represents the file to detect.
 	 * @return the file type provided by the "file" command using the "-b"
 	 *         option (it stands for "brief mode").
-	 * @throws IOException if any I/O error occurs.
+	 * @throws IOException
+	 *             if any I/O error occurs.
 	 */
-	private String doFile(File input) throws IOException {
-		String[] cmd = { "file", "-b", input.getPath() };
+	private String doFile(File input, FileConfig config) throws IOException {
+		if (!hasFile(config)) {
+			return null;
+		}
+		
+		// Builds the command array
+		ArrayList<String> cmdList = new ArrayList<String>(3);
+		cmdList.add(config.getFilePath() + getFileProg());
+		cmdList.add("-b");
+		if (config.isMimetype()) {
+			cmdList.add("-I");
+		}
+		cmdList.add(input.getPath());
+		
+		String[] cmd = cmdList.toArray(new String[cmdList.size()]);
 
 		ProcessBuilder pb = new ProcessBuilder(cmd);
 		final Process process = pb.start();
@@ -239,6 +286,7 @@ public class StringsParser extends AbstractParser {
 		String fileOutput = null;
 
 		try {
+			// TODO reader = new BufferedReader(new InputStreamReader(out, IOUtils.UTF_8));
 			reader = new BufferedReader(new InputStreamReader(out));
 			fileOutput = reader.readLine();
 
@@ -252,5 +300,14 @@ public class StringsParser extends AbstractParser {
 		}
 
 		return fileOutput;
+	}
+
+	
+	public static String getStringsProg() {
+		return System.getProperty("os.name").startsWith("Windows") ? "strings.exe" : "strings";
+	}
+	
+	public static String getFileProg() {
+		return System.getProperty("os.name").startsWith("Windows") ? "file.exe" : "file";
 	}
 }

@@ -30,5 +30,5 @@ fi
 
 for file in $DATA_DIR/*
 do
-	java -cp ./:./lib/tika-app-1.7.jar:./bin org.apache.tika.parser.strings.StringsTest ${file} $OUT_DIR/$(basename $file).$EXT >>strings_parsers.log 2>&1 
+	java -cp ./:./lib/tika-app-1.7.jar:./bin TestStringsParser ${file} $OUT_DIR/$(basename $file).$EXT >>strings_parsers.log 2>&1 
 done

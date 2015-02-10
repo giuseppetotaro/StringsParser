@@ -18,8 +18,6 @@ import java.io.Serializable;
 
 /**
  * Configuration for the "strings" (or strings-alternative) command.
- * 
- * @author gtotaro
  *
  */
 public class StringsConfig implements Serializable {
@@ -28,17 +26,22 @@ public class StringsConfig implements Serializable {
 	 */
 	private static final long serialVersionUID = -1465227101645003594L;
 
-	private String stringsCmd = "strings";
-
 	private String stringsPath = "";
+	
+	// Minimum sequence length (characters) to print
+	private int minLength = 4;
+	
+	// Character encoding of the strings that are to be found
+	private StringsEncoding encoding = StringsEncoding.SINGLE_7_BIT;
 
+	// Maximum time (seconds) to wait for the strings process termination
 	private int timeout = 120;
 
 	/**
 	 * Default constructor.
 	 */
 	public StringsConfig() {
-		// TODO
+		// TODO Loads properties from InputStream.
 	}
 
 	/**
@@ -49,24 +52,23 @@ public class StringsConfig implements Serializable {
 	public String getStringsPath() {
 		return this.stringsPath;
 	}
-
+	
 	/**
-	 * Returns the "strings" command name.
+	 * Returns the minimum sequence length (characters) to print.
 	 * 
-	 * @return the "strings" command name.
+	 * @return the minimum sequence length (characters) to print.
 	 */
-	public String getStringsCommand() {
-		return this.stringsCmd;
+	public int getMinLength() {
+		return this.minLength;
 	}
-
+	
 	/**
-	 * Returns the command-line options for the "strings" command.
+	 * Returns the character encoding of the strings that are to be found.
 	 * 
-	 * @return the command-line options for the "strings" command.
+	 * @return {@see StringsEncoding} enum that represents the character encoding of the strings that are to be found.
 	 */
-	public String getOptions() {
-		// TODO
-		return null;
+	public StringsEncoding getEncoding() {
+		return this.encoding;
 	}
 
 	/**
@@ -93,23 +95,23 @@ public class StringsConfig implements Serializable {
 		}
 		this.stringsPath = path;
 	}
-
+	
 	/**
-	 * Sets the "strings" (or strings-alternative) command name. It allows to
-	 * use a strings-alternative command, if available.
+	 * Sets the minimum sequence length (characters) to print.
 	 * 
-	 * @param command the "strings" (or strings-alternative) command name.
+	 * @param minLength the minimum sequence length (characters) to print.
 	 */
-	public void setStringsCommand(String command) {
-		this.stringsCmd = command;
+	public void setMinLength(int minLength) {
+		this.minLength = minLength;
 	}
-
+	
 	/**
-	 * Sets command-line options for the "strings" command.
-	 * @param options the command-line options for the "strings" command.
+	 * Sets the character encoding of the strings that are to be found.
+	 * 
+	 * @param encoding {@see StringsEncoding} enum that represents the character encoding of the strings that are to be found.
 	 */
-	public void setOptions(String options) {
-		// TODO
+	public void setEncodings(StringsEncoding encoding) {
+		this.encoding = encoding;
 	}
 
 	/**

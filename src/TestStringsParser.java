@@ -1,5 +1,4 @@
-package org.apache.tika.parser.strings;
-
+import org.apache.tika.parser.strings.*;
 import it.cnr.rm.iac.util.Timer;
 
 import java.io.File;
@@ -16,10 +15,9 @@ import org.xml.sax.ContentHandler;
 
 /**
  * Simple class to test the StringsParser.
- * @author gtotaro
  *
  */
-public class StringsTest {
+public class TestStringsParser {
 
 	public static void main(String[] args) throws IOException {
 		if (args.length < 2) {
