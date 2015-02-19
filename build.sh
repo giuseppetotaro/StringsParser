@@ -20,5 +20,5 @@ mkdir -p bin
 
 for file in $(find . -name "*.java" -print)
 do
-	javac -cp ./:./lib/tika-app-1.7.jar:./lib/junit-4.12.jar:./src -d ./bin ${file}
+	javac -cp ./:./lib/tika-app-1.8-SNAPSHOT.jar:./lib/junit-4.12.jar:./src -d ./bin ${file}
 done

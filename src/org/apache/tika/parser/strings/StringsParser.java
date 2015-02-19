@@ -20,6 +20,8 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -60,6 +62,13 @@ public class StringsParser extends AbstractParser {
 	private static final StringsConfig DEFAULT_STRINGS_CONFIG = new StringsConfig();
 	
 	private static final FileConfig DEFAULT_FILE_CONFIG = new FileConfig();
+	
+	/*
+	 * This map is organized as follows:
+	 * command's pathname (String) -> is it present? (Boolean), does it support -e option? (Boolean)
+	 * It stores check results for command and, if present, -e (encoding) option.
+	 */
+	private static Map<String,Boolean[]> STRINGS_PRESENT = new HashMap<String, Boolean[]>();
 
 	@Override
 	public Set<MediaType> getSupportedTypes(ParseContext context) {
@@ -110,14 +119,38 @@ public class StringsParser extends AbstractParser {
 	 */
 	private boolean hasStrings(StringsConfig config) {
 		String stringsProg = config.getStringsPath() + getStringsProg();
+		
+		if (STRINGS_PRESENT.containsKey(stringsProg)) {
+			return STRINGS_PRESENT.get(stringsProg)[0];
+		}
 
 		String[] checkCmd = { stringsProg, "--version" };
+		try {
+			boolean hasStrings = ExternalParser.check(checkCmd);
 
-		boolean hasStrings = ExternalParser.check(checkCmd);
+			boolean encodingOpt = false;
 
-		return hasStrings;
+			// Check if the -e option (encoding) is supported
+			if (!System.getProperty("os.name").startsWith("Windows")) {
+				String[] checkOpt = {stringsProg, "-e", "" + config.getEncoding().get(), "/dev/null"};
+				int[] errorValues = {1, 2}; // Exit status code: 1 = general error; 2 = incorrect usage.
+				encodingOpt = ExternalParser.check(checkOpt, errorValues);
+			}
+		
+			Boolean[] values = {hasStrings, encodingOpt};
+			STRINGS_PRESENT.put(stringsProg, values);
+
+			return hasStrings;
+		} catch (NoClassDefFoundError ncdfe) {
+			// This happens under OSGi + Fork Parser - see TIKA-1507
+			// As a workaround for now, just say we can't use strings
+			// TODO Resolve it so we don't need this try/catch block
+			Boolean[] values = {false, false};
+			STRINGS_PRESENT.put(stringsProg, values);
+			return false;
+		}
 	}
-	
+
 	/**
 	 * Checks if the "file" command is supported.
 	 * 
@@ -155,20 +188,22 @@ public class StringsParser extends AbstractParser {
 			XHTMLContentHandler xhtml) throws IOException, TikaException,
 			SAXException {
 		
+		String stringsProg = config.getStringsPath() + getStringsProg();
+		
 		// Builds the command array
 		ArrayList<String> cmdList = new ArrayList<String>(4);
-		cmdList.add(config.getStringsPath() + getStringsProg());
+		cmdList.add(stringsProg);
 		cmdList.add("-n");
 		cmdList.add("" + config.getMinLength());;
-		// encoding option is not supported by windows version
-		if (!getStringsProg().endsWith(".exe")) {
+		// Currently, encoding option is not supported by Windows (and other) versions
+		if (STRINGS_PRESENT.get(stringsProg)[1]) {
 			cmdList.add("-e");
 			cmdList.add("" + config.getEncoding().get());
 		}
 		cmdList.add(input.getPath());
 		
 		String[] cmd = cmdList.toArray(new String[cmdList.size()]);
-
+		
 		ProcessBuilder pb = new ProcessBuilder(cmd);
 		final Process process = pb.start();
 
@@ -232,8 +267,7 @@ public class StringsParser extends AbstractParser {
 		int totalBytes = 0;
 
 		try {
-			// TODO reader = new BufferedReader(new InputStreamReader(stream, IOUtils.UTF_8));
-			reader = new BufferedReader(new InputStreamReader(stream));
+			reader = new BufferedReader(new InputStreamReader(stream, IOUtils.UTF_8));
 
 			int n = 0;
 			while ((n = reader.read(buffer)) != -1) {
@@ -286,15 +320,12 @@ public class StringsParser extends AbstractParser {
 		String fileOutput = null;
 
 		try {
-			// TODO reader = new BufferedReader(new InputStreamReader(out, IOUtils.UTF_8));
-			reader = new BufferedReader(new InputStreamReader(out));
+			reader = new BufferedReader(new InputStreamReader(out, IOUtils.UTF_8));
 			fileOutput = reader.readLine();
 
 		} catch (IOException ioe) {
-			// TODO
-			System.err
-					.println("An error occurred in reading output of the file command: "
-							+ ioe.getMessage());
+			// file output not available!
+			fileOutput = "";
 		} finally {
 			reader.close();
 		}
